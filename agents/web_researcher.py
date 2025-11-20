@@ -34,7 +34,7 @@ class WebResearcher:
             )
             
             # Extract the text and any grounding metadata if needed
-            # For now, we just return the text which should be grounded
+            # For now, I just return the text which should be grounded
             return response.text
             
         except Exception as e:
