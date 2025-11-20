@@ -4,6 +4,7 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 import re
 
+
 def render_molecule(smiles_string):
     """Draws the molecule to the sidebar or chat"""
     mol = Chem.MolFromSmiles(smiles_string)
@@ -11,6 +12,7 @@ def render_molecule(smiles_string):
         img = Draw.MolToImage(mol, size=(300, 300))
         return img
     return None
+
 
 # Page Config (Make it look pro)
 st.set_page_config(page_title="Project Chimera", page_icon="🧬", layout="wide")
@@ -55,38 +57,43 @@ if prompt := st.chat_input("Enter your research goal (e.g., 'Find inhibitors for
         try:
             # Run the Orchestrator
             response = st.session_state.bot.run(prompt)
-            
+
             # Ensure response is a string (handle edge cases)
             if not isinstance(response, str):
                 response = str(response)
-            
+
             message_placeholder.markdown(response)
 
             # Save history
             st.session_state.messages.append(
                 {"role": "assistant", "content": response})
-                
+
             # --- VISUALIZATION MAGIC ---
             # Check for SMILES in the response (looking for code blocks or specific patterns)
             # Simple regex to find potential SMILES (this is a basic one, can be improved)
             # For now, we'll look for the specific format from our Lab Rat: "SMILES: `...`"
             smiles_match = re.search(r"SMILES: `([^`]+)`", response)
-            
+
             if smiles_match:
                 smiles_str = smiles_match.group(1)
                 mol_img = render_molecule(smiles_str)
-                
+
                 if mol_img:
-                    st.sidebar.image(mol_img, caption=f"Molecule: {smiles_str}", use_container_width=True)
-                    
+                    st.sidebar.image(
+                        mol_img, caption=f"Molecule: {smiles_str}", use_container_width=True)
+
                     # Extract other metrics if available
-                    mw_match = re.search(r"Molecular Weight: ([\d.]+)", response)
-                    ba_match = re.search(r"Binding.*Score.*?: ([\d.]+)", response)
-                    
+                    mw_match = re.search(
+                        r"Molecular Weight: ([\d.]+)", response)
+                    ba_match = re.search(
+                        r"Binding.*Score.*?: ([\d.]+)", response)
+
                     if mw_match:
-                        st.sidebar.metric("Molecular Weight", f"{mw_match.group(1)} g/mol")
+                        st.sidebar.metric("Molecular Weight",
+                                          f"{mw_match.group(1)} g/mol")
                     if ba_match:
-                        st.sidebar.metric("Binding Affinity", ba_match.group(1))
+                        st.sidebar.metric("Binding Affinity",
+                                          ba_match.group(1))
 
         except Exception as e:
             error_msg = f"System Failure: {str(e)}"

@@ -64,7 +64,31 @@ class Orchestrator:
         result = self.agent_graph.invoke(inputs)
 
         # --- DOUBLE SAFETY: CLEAN THE OUTPUT ---
-        final_response = result["messages"][-1].content
+        final = result["messages"][-1].content
+
+        # Helper function to normalize content to plain text
+        def _to_plain_text(content):
+            """Convert AIMessage.content to plain text, handling str/list/dict types."""
+            if isinstance(content, str):
+                return content.strip()
+            if isinstance(content, list):
+                parts = []
+                for p in content:
+                    if isinstance(p, dict):
+                        t = p.get("text") or p.get("content")
+                        if isinstance(t, str):
+                            parts.append(t)
+                    elif isinstance(p, str):
+                        parts.append(p)
+                return "\n".join(parts).strip() or str(content)
+            if isinstance(content, dict):
+                return (content.get("text")
+                        or content.get("content")
+                        or str(content))
+            return str(content)
+
+        # Normalize content to plain text first
+        final_response = _to_plain_text(final)
 
         # Robust cleanup for Gemini's raw tool output format
         if isinstance(final_response, str):
