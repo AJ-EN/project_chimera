@@ -36,7 +36,21 @@ class WebResearcher:
             # Extract the text - handle different response formats
             result = response.text
             
-            # Sometimes the API returns a list of dicts, sometimes just text
+            # parsing logic for when result is a string representation of a list/dict
+            try:
+                import ast
+                # If it looks like a list or dict string, try to parse it
+                if isinstance(result, str) and (result.strip().startswith('[') or result.strip().startswith('{')):
+                    parsed = ast.literal_eval(result)
+                    if isinstance(parsed, list) and len(parsed) > 0 and isinstance(parsed[0], dict):
+                        return parsed[0].get('text', str(parsed))
+                    elif isinstance(parsed, dict):
+                        return parsed.get('text', str(parsed))
+            except:
+                # If parsing fails, just continue and return the original string
+                pass
+
+            # Sometimes the API returns a list of dicts (actual object), sometimes just text
             if isinstance(result, list):
                 # Extract text from the first item if it's a list
                 if result and isinstance(result[0], dict) and 'text' in result[0]:
