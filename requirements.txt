@@ -1,0 +1,11 @@
+google-generativeai
+langchain
+langchain-google-genai
+langchain-community
+streamlit
+pandas
+rdkit
+python-dotenv
+faiss-cpu
+pypdf
+plotly
