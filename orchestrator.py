@@ -1,85 +1,73 @@
 import os
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import initialize_agent, Tool, AgentType
+from langgraph.prebuilt import create_react_agent # The Modern Way
+from langchain_core.messages import SystemMessage
+
+# Import your custom agents
 from agents.librarian import Librarian
 from agents.lab_rat import LabRat
 from agents.web_researcher import WebResearcher
+from langchain.tools import Tool
+
+load_dotenv()
 
 class Orchestrator:
     def __init__(self):
+        # 1. Initialize the Brain (Gemini 2.5 Flash)
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",  # Use Flash for speed, Pro for reasoning
+            model="gemini-2.5-flash",
             temperature=0.2,
             convert_system_message_to_human=True
         )
         
-        # Initialize Agents
+        # 2. Initialize your Specialist Agents
         self.librarian = Librarian()
         self.lab_rat = LabRat()
         self.web_researcher = WebResearcher()
 
-        # Define Tools
+        # 3. Define Tools (The "Hands" of the Agent)
         self.tools = [
             Tool(
                 name="Librarian_Search",
                 func=self.librarian.search,
-                description="Useful for finding specific biological targets and PDB IDs from the internal PDF library. Use this for specific drug discovery tasks."
+                description="Use this to find biological targets (e.g., 'Find the target for E. Coli')."
             ),
             Tool(
                 name="Lab_Rat_Simulation",
                 func=self.lab_rat.run_simulation,
-                description="Useful for screening drugs and calculating binding affinity scores. Input should be the molecule name."
+                description="Use this to screen drugs (e.g., 'Simulate Ciprofloxacin'). Input: Molecule Name."
             ),
             Tool(
                 name="Web_Search",
                 func=self.web_researcher.search,
-                description="Useful for answering general questions, finding the latest research, or when the Librarian doesn't have the info. Use this for 'What is...', 'Latest research on...', or casual chat."
+                description="Use this for general questions or latest news (e.g., 'What is the flu?')."
             )
         ]
 
-        # Initialize the Agent
-        self.agent = initialize_agent(
-            self.tools,
-            self.llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            # This prints the "Thought Process" to the console (Crucial for debugging)
-            verbose=True,
-            handle_parsing_errors=True,
-            max_iterations=5,
-            early_stopping_method="generate"
-        )
-
+        # 4. Create the Graph (The "New" Way)
+        # This automatically creates a 'Supervisor' workflow that the course teaches
+        self.agent_graph = create_react_agent(self.llm, self.tools)
 
     def run(self, user_query):
-        system_prompt = """
-        You are Dr. Chimera, the Principal Investigator of an autonomous drug discovery lab.
-        
-        You have three modes of operation:
-        1. **General Chat / Latest Research**: Use the 'Web_Search' tool.
-           - Example: "Hi", "What can you do?", "Latest research on Alzheimer's".
-           
-        2. **Internal Knowledge Retrieval**: Use 'Librarian_Search'.
-           - Use this when asked to find targets from your internal files.
-           
-        3. **Drug Discovery Protocol** (Strict):
-           - If asked to "Find a cure" or "Screen drugs":
-             1. Use 'Librarian_Search' to find a target (PDB ID).
-             2. Use 'Lab_Rat_Simulation' to screen drugs.
-             3. Synthesize results.
-        
-        CRITICAL INSTRUCTION: 
-        Once you have a simulation result OR a web search answer, you MUST immediately provide a Final Answer. 
-        Do not keep searching.
-        
-        Format:
-        Final Answer: [Your recommendation here]
+        # 5. The System Prompt (The "Personality")
+        system_instruction = """You are Dr. Chimera, a Nobel-prize winning computational biologist.
+        Protocol:
+        1. If the user asks for a cure/drug, FIRST use 'Librarian_Search' to find the biological target (PDB ID).
+        2. THEN use 'Lab_Rat_Simulation' to screen candidate molecules against that target.
+        3. ALWAYS explain the science behind your decision.
+        4. If the user just says 'Hi' or asks general questions, use 'Web_Search'.
         """
-
-        # We prepend the system prompt to the user query for the Zero Shot Agent
-        full_prompt = f"{system_prompt}\n\nUser Query: {user_query}"
-        return self.agent.run(full_prompt)
-
+        
+        # 6. Run the Graph
+        inputs = {"messages": [("system", system_instruction), ("user", user_query)]}
+        
+        # We stream the output to get the final response
+        # In a real app, you might want to stream intermediate steps to the UI
+        result = self.agent_graph.invoke(inputs)
+        
+        # Extract the final message content
+        return result["messages"][-1].content
 
 # Test block
 if __name__ == "__main__":

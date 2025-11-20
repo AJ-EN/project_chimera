@@ -2,6 +2,7 @@ google-generativeai
 langchain
 langchain-google-genai
 langchain-community
+langgraph
 streamlit
 pandas
 rdkit
