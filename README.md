@@ -30,3 +30,5 @@ To add new research papers:
     ```bash
     python agents/librarian.py
     ```
+
+Find a cure for E. Coli.
