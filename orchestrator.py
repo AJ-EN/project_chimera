@@ -1,10 +1,8 @@
 import os
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.prebuilt import create_react_agent # The Modern Way
+from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage
-
-# Import your custom agents
 from agents.librarian import Librarian
 from agents.lab_rat import LabRat
 from agents.web_researcher import WebResearcher
@@ -14,62 +12,70 @@ load_dotenv()
 
 class Orchestrator:
     def __init__(self):
-        # 1. Initialize the Brain (Gemini 2.5 Flash)
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
             temperature=0.2,
             convert_system_message_to_human=True
         )
         
-        # 2. Initialize your Specialist Agents
         self.librarian = Librarian()
         self.lab_rat = LabRat()
         self.web_researcher = WebResearcher()
 
-
-        # 3. Define Tools (The "Hands" of the Agent)
-        # Using the modern @tool decorator approach for LangGraph
+        # Define tools using @tool decorator for LangGraph compatibility
         @tool
         def librarian_search(query: str) -> str:
-            """Use this to find biological targets (e.g., 'Find the target for E. Coli')."""
+            """Find biological targets (e.g., 'Find the target for E. Coli'). Returns text."""
             return self.librarian.search(query)
         
         @tool
         def lab_rat_simulation(molecule_name: str) -> str:
-            """Use this to screen drugs (e.g., 'Simulate Ciprofloxacin'). Input: Molecule Name."""
+            """Screen drugs. Input: Molecule Name. Returns text report."""
             return self.lab_rat.run_simulation(molecule_name)
         
         @tool
         def web_search(query: str) -> str:
-            """Use this for general questions or latest news (e.g., 'What is the flu?')."""
+            """Search the web. Returns text."""
             return self.web_researcher.search(query)
-        
-        self.tools = [librarian_search, lab_rat_simulation, web_search]
 
-        # This automatically creates a 'Supervisor' workflow that the course teaches
+        self.tools = [librarian_search, lab_rat_simulation, web_search]
         self.agent_graph = create_react_agent(self.llm, self.tools)
 
     def run(self, user_query):
-        # 5. The System Prompt (The "Personality")
-        system_instruction = """You are Dr. Chimera, a Nobel-prize winning computational biologist.
-        Protocol:
-        1. If the user asks for a cure/drug, FIRST use 'Librarian_Search' to find the biological target (PDB ID).
-        2. THEN use 'Lab_Rat_Simulation' to screen candidate molecules against that target.
-        3. ALWAYS explain the science behind your decision.
-        4. If the user just says 'Hi' or asks general questions, use 'Web_Search'.
+        # --- THE FIX IS HERE: IMPROVED SYSTEM PROMPT ---
+        system_instruction = """You are Dr. Chimera, an AI computational biologist.
+        
+        PROTOCOL:
+        1. Receive the user's query.
+        2. Select the correct tool (Librarian, Lab Rat, or Web Search).
+        3. **CRITICAL:** When the tool returns a result, you MUST read it and then write a NATURAL LANGUAGE response.
+        4. **NEVER** output the raw JSON or dictionary from the tool directly to the user.
+        5. If the tool gives you JSON like {'text': '...'}, extract the 'text' part and summarize it.
+        6. Always sound professional and scientific.
+        
+        Example of BAD Output: {'text': 'Cure found...'}
+        Example of GOOD Output: "Based on my research, I have found a potential cure..."
         """
         
-        # 6. Run the Graph
         inputs = {"messages": [("system", system_instruction), ("user", user_query)]}
-        
-        # We stream the output to get the final response
-        # In a real app, you might want to stream intermediate steps to the UI
         result = self.agent_graph.invoke(inputs)
         
-        # Extract the final message content
-        return result["messages"][-1].content
+        # --- DOUBLE SAFETY: CLEAN THE OUTPUT ---
+        final_response = result["messages"][-1].content
+        
+        # If the model still fails and outputs a string representation of a dict, clean it manually
+        if isinstance(final_response, str) and final_response.strip().startswith("{"):
+             try:
+                 # Simple heuristic cleanup if it looks like a Python dict string
+                 import ast
+                 parsed = ast.literal_eval(final_response)
+                 if isinstance(parsed, dict) and 'text' in parsed:
+                     return parsed['text']
+             except:
+                 pass
+                 
+        return final_response
 
-# Test block
 if __name__ == "__main__":
     bot = Orchestrator()
     print(bot.run("Find a cure for E. Coli resistance"))
