@@ -33,9 +33,21 @@ class WebResearcher:
                 config=config,
             )
             
-            # Extract the text and any grounding metadata if needed
-            # For now, I just return the text which should be grounded
-            return response.text
+            # Extract the text - handle different response formats
+            result = response.text
+            
+            # Sometimes the API returns a list of dicts, sometimes just text
+            if isinstance(result, list):
+                # Extract text from the first item if it's a list
+                if result and isinstance(result[0], dict) and 'text' in result[0]:
+                    return result[0]['text']
+                return str(result)
+            elif isinstance(result, dict):
+                # Extract text if it's a dict
+                return result.get('text', str(result))
+            
+            # Otherwise return as-is (should be a string)
+            return result
             
         except Exception as e:
             return f"Web Search Error: {str(e)}"

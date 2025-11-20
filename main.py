@@ -55,6 +55,11 @@ if prompt := st.chat_input("Enter your research goal (e.g., 'Find inhibitors for
         try:
             # Run the Orchestrator
             response = st.session_state.bot.run(prompt)
+            
+            # Ensure response is a string (handle edge cases)
+            if not isinstance(response, str):
+                response = str(response)
+            
             message_placeholder.markdown(response)
 
             # Save history
@@ -68,23 +73,23 @@ if prompt := st.chat_input("Enter your research goal (e.g., 'Find inhibitors for
             smiles_match = re.search(r"SMILES: `([^`]+)`", response)
             
             if smiles_match:
-                smiles = smiles_match.group(1)
-                st.sidebar.markdown("### 🧬 Target Molecule")
-                img = render_molecule(smiles)
-                if img:
-                    st.sidebar.image(img, caption="Calculated Structure")
+                smiles_str = smiles_match.group(1)
+                mol_img = render_molecule(smiles_str)
                 
-                # Extract other metrics if available (simple parsing)
-                mw_match = re.search(r"Molecular Weight: ([\d\.]+) g/mol", response)
-                affinity_match = re.search(r"Binding Affinity Score: ([\d\.]+)", response)
-                
-                if affinity_match:
-                    score = float(affinity_match.group(1))
-                    delta = "+ High" if score > 0.8 else "- Low"
-                    st.sidebar.metric("Binding Affinity", f"{score}", delta)
-                
-                if mw_match:
-                    st.sidebar.metric("Mol. Weight", f"{mw_match.group(1)} g/mol")
+                if mol_img:
+                    st.sidebar.image(mol_img, caption=f"Molecule: {smiles_str}", use_container_width=True)
+                    
+                    # Extract other metrics if available
+                    mw_match = re.search(r"Molecular Weight: ([\d.]+)", response)
+                    ba_match = re.search(r"Binding.*Score.*?: ([\d.]+)", response)
+                    
+                    if mw_match:
+                        st.sidebar.metric("Molecular Weight", f"{mw_match.group(1)} g/mol")
+                    if ba_match:
+                        st.sidebar.metric("Binding Affinity", ba_match.group(1))
 
         except Exception as e:
-            message_placeholder.error(f"System Failure: {str(e)}")
+            error_msg = f"System Failure: {str(e)}"
+            message_placeholder.markdown(error_msg)
+            st.session_state.messages.append(
+                {"role": "assistant", "content": error_msg})
