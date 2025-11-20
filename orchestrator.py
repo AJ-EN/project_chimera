@@ -8,7 +8,7 @@ from langchain_core.messages import SystemMessage
 from agents.librarian import Librarian
 from agents.lab_rat import LabRat
 from agents.web_researcher import WebResearcher
-from langchain.tools import Tool
+from langchain_core.tools import tool
 
 load_dotenv()
 
@@ -26,26 +26,26 @@ class Orchestrator:
         self.lab_rat = LabRat()
         self.web_researcher = WebResearcher()
 
-        # 3. Define Tools (The "Hands" of the Agent)
-        self.tools = [
-            Tool(
-                name="Librarian_Search",
-                func=self.librarian.search,
-                description="Use this to find biological targets (e.g., 'Find the target for E. Coli')."
-            ),
-            Tool(
-                name="Lab_Rat_Simulation",
-                func=self.lab_rat.run_simulation,
-                description="Use this to screen drugs (e.g., 'Simulate Ciprofloxacin'). Input: Molecule Name."
-            ),
-            Tool(
-                name="Web_Search",
-                func=self.web_researcher.search,
-                description="Use this for general questions or latest news (e.g., 'What is the flu?')."
-            )
-        ]
 
-        # 4. Create the Graph (The "New" Way)
+        # 3. Define Tools (The "Hands" of the Agent)
+        # Using the modern @tool decorator approach for LangGraph
+        @tool
+        def librarian_search(query: str) -> str:
+            """Use this to find biological targets (e.g., 'Find the target for E. Coli')."""
+            return self.librarian.search(query)
+        
+        @tool
+        def lab_rat_simulation(molecule_name: str) -> str:
+            """Use this to screen drugs (e.g., 'Simulate Ciprofloxacin'). Input: Molecule Name."""
+            return self.lab_rat.run_simulation(molecule_name)
+        
+        @tool
+        def web_search(query: str) -> str:
+            """Use this for general questions or latest news (e.g., 'What is the flu?')."""
+            return self.web_researcher.search(query)
+        
+        self.tools = [librarian_search, lab_rat_simulation, web_search]
+
         # This automatically creates a 'Supervisor' workflow that the course teaches
         self.agent_graph = create_react_agent(self.llm, self.tools)
 
