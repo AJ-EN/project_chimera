@@ -63,16 +63,30 @@ class Orchestrator:
         # --- DOUBLE SAFETY: CLEAN THE OUTPUT ---
         final_response = result["messages"][-1].content
         
-        # If the model still fails and outputs a string representation of a dict, clean it manually
-        if isinstance(final_response, str) and final_response.strip().startswith("{"):
-             try:
-                 # Simple heuristic cleanup if it looks like a Python dict string
-                 import ast
-                 parsed = ast.literal_eval(final_response)
-                 if isinstance(parsed, dict) and 'text' in parsed:
-                     return parsed['text']
-             except:
-                 pass
+        # Robust cleanup for Gemini's raw tool output format: "[{'type': 'text', ...}]"
+        if isinstance(final_response, str):
+            cleaned_response = final_response.strip()
+            
+            # Check if it looks like a list or dict
+            if cleaned_response.startswith("[") or cleaned_response.startswith("{"):
+                try:
+                    import ast
+                    parsed = ast.literal_eval(cleaned_response)
+                    
+                    # Case 1: List of dicts (e.g. [{'type': 'text', 'text': '...'}])
+                    if isinstance(parsed, list) and len(parsed) > 0 and isinstance(parsed[0], dict):
+                        # Look for 'text' key in the first element
+                        if 'text' in parsed[0]:
+                            return parsed[0]['text']
+                            
+                    # Case 2: Single dict (e.g. {'text': '...'})
+                    elif isinstance(parsed, dict):
+                        if 'text' in parsed:
+                            return parsed['text']
+                            
+                except Exception:
+                    # If parsing fails, return original text
+                    pass
                  
         return final_response
 
