@@ -1,4 +1,4 @@
-google-generativeai
+google-genai
 langchain
 langchain-google-genai
 langchain-community
